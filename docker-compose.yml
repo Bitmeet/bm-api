@@ -1,0 +1,8 @@
+version: '2.0'
+services:
+  app:
+    build: .
+    environment:
+      - MONGO_URL=mongodb://mongo/local
+  mongo:
+    image: mongo

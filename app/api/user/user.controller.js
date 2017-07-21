@@ -1,8 +1,11 @@
 'use strict';
 
-const User   = require('./user.model').User;
+const User = require('./user.model').User;
 const config = require('./../../../config');
-const jwt    = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
+const sendgrid = require('sendgrid');
+sendgrid(config.email.id);
+
 
 function validationError(res, statusCode) {
     statusCode = statusCode || 422;
@@ -23,7 +26,6 @@ function handleError(res, statusCode) {
  * restriction: 'admin'
  */
 function index(req, res) {
-    console.log('lalal');
     return User.find({}, '-salt -password').exec()
         .then(users => {
             res.status(200).json(users);
@@ -35,11 +37,14 @@ function index(req, res) {
  * Creates a new user
  */
 function create(req, res) {
-    const newUser    = new User(req.body);
+    const newUser = new User(req.body);
     newUser.provider = 'local';
-    newUser.role     = 'user';
+    newUser.role = 'user';
     newUser.save()
         .then(function (user) {
+            const protocol = (req.secure) ? 'https://' : 'http://';
+            const url = protocol + req.headers.host + '/';
+            sendNewUserEmail(url, req.body.email, req.body.name, user._id);
             const token = jwt.sign({ _id: user._id }, config.secrets.session, {
                 expiresIn: 60 * 60 * 5
             });
@@ -80,7 +85,7 @@ function destroy(req, res) {
  * Change a users password
  */
 function changePassword(req, res) {
-    const userId  = req.user._id;
+    const userId = req.user._id;
     const oldPass = String(req.body.oldPassword);
     const newPass = String(req.body.newPassword);
 
@@ -120,6 +125,32 @@ function me(req, res, next) {
  */
 function authCallback(req, res) {
     res.redirect('/');
+}
+
+function sendNewUserEmail(url, email, name, id) {
+    if (config.emai.sendEmail) {
+        var params = {
+            smtpapi: new sendgrid.smtpapi(),
+            to: email,
+            from: 'info@bitmeet.co',
+            // subject: 'Welcome to Bitmeet',
+            // html: '<b>Hello ' + name + ', </b><br><br>' +
+            //  'Click on the link to complete registration : <a href="' + url + 'api/users/verify/' + id +'">' + url + 'api/users/verify/' + id +'</a>'
+            subject: 'ברוכים הבאים ל-Bitmeet!',
+            html: '<html lang="he" dir="rtl"><body dir="rtl"><b>שלום ' + name + ', </b><br><br>' +
+            'אנא לחצו על הלינק להשלמת הרישום: <a href="' + url + 'api/users/verify/' + id + '">' + url + 'api/users/verify/' + id + '</a><br><br>' +
+            'בתודה,<br>צוות Bitmeet</body></html>'
+        };
+        var sendEmail = new sendgrid.Email(params);
+        sendgrid.send(sendEmail, function (err, json) {
+            if (err) {
+                return console.error(err)
+            }
+            console.log(json);
+        });
+    } else {
+        console.warn(`Email sending was deiabled in the configuration. Use url: ${url + 'api/users/verify/'}`);
+    }
 }
 
 module.exports = {

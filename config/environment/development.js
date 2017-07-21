@@ -2,9 +2,12 @@
 
 module.exports = {
     mongo: {
-        uri: 'mongodb://codefresh.dev:27017/bm'
+        uri: process.env.MONGO_URI || 'mongodb://localhost:27017/local'
     },
     secrets: {
         session: 'bm-api'
     },
+    email: {
+        sendEmail: false
+    }
 };
